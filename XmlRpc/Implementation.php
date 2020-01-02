@@ -33,10 +33,10 @@ class Implementation extends BaseImplementation
     const SCHEMA_NAME = "xmlrpc.xsd";
 
     /**
-     * @param  Request                                         $request
-     * @throws \Seven\RpcBundle\Exception\InvalidXmlRpcContent
-     * @throws \Seven\RpcBundle\Exception\XmlRpcSchemaNotFound
+     * @param Request $request
      * @return MethodCall
+     * @throws \Seven\RpcBundle\Exception\XmlRpcSchemaNotFound
+     * @throws \Seven\RpcBundle\Exception\InvalidXmlRpcContent
      */
 
     public function createMethodCall(Request $request)
@@ -58,7 +58,7 @@ class Implementation extends BaseImplementation
         $xpath = new \DOMXPath($document);
 
         // extract name
-        $methodName = (string) $xpath->query("//methodCall/methodName")->item(0)->nodeValue;
+        $methodName = (string)$xpath->query("//methodCall/methodName")->item(0)->nodeValue;
         // extract parameters
         $parameters = array();
         $rawParameters = $xpath->query("//methodCall/params/param/value");
@@ -91,9 +91,9 @@ class Implementation extends BaseImplementation
         $valid = $document->schemaValidate($schema);
         libxml_use_internal_errors($useInternal);
 
-        if(!$valid || ($rootNodeName && $document->firstChild->nodeName != $rootNodeName))
-
+        if (!$valid || ($rootNodeName && $document->firstChild->nodeName != $rootNodeName)) {
             return false;
+        }
 
         return true;
     }
@@ -105,20 +105,21 @@ class Implementation extends BaseImplementation
     protected function getSchema()
     {
         if ($this->schema === null) {
-            $fileLocator = new FileLocator(dirname(__DIR__) . "/Resources/schema");
+            $fileLocator = new FileLocator(dirname(__DIR__)."/Resources/schema");
             $this->schema = $fileLocator->locate(self::SCHEMA_NAME);
 
-            if(is_array($this->schema))
+            if (is_array($this->schema)) {
                 $this->schema = reset($this->schema);
+            }
         }
 
         return $this->schema;
     }
 
     /**
-     * @param  MethodResponse                                   $response
-     * @throws \Seven\RpcBundle\Exception\UnknownMethodResponse
+     * @param MethodResponse $response
      * @return Response
+     * @throws \Seven\RpcBundle\Exception\UnknownMethodResponse
      */
 
     public function createHttpResponse(MethodResponse $response)
@@ -135,7 +136,13 @@ class Implementation extends BaseImplementation
             $paramEl->appendChild($this->pack($document, $response->getReturnValue(), $response->getReturnType()));
         } elseif ($response instanceof MethodFault) {
             $responseEl->appendChild($faultEl = $document->createElement("fault"));
-            $faultEl->appendChild($this->pack($document, array('faultCode' => $response->getCode(), 'faultString' => $response->getMessage()), ValueType::Object));
+            $faultEl->appendChild(
+                $this->pack(
+                    $document,
+                    array('faultCode' => $response->getCode(), 'faultString' => $response->getMessage()),
+                    ValueType::Object
+                )
+            );
         } else {
             throw new UnknownMethodResponse("Unknown MethodResponse instance");
         }
@@ -144,11 +151,11 @@ class Implementation extends BaseImplementation
     }
 
     /**
-     * @param  Response                                        $response
-     * @throws \Seven\RpcBundle\Exception\Fault
+     * @param Response $response
+     * @return MethodResponse
      * @throws \Seven\RpcBundle\Exception\XmlRpcSchemaNotFound
      * @throws \Seven\RpcBundle\Exception\InvalidXmlRpcContent
-     * @return MethodResponse
+     * @throws \Seven\RpcBundle\Exception\Fault
      */
 
     public function createMethodResponse(Response $response)
@@ -174,6 +181,10 @@ class Implementation extends BaseImplementation
         if ($faultEl = $xpath->query("//methodResponse/fault")->item(0)) {
             $struct = $this->extract($faultEl->firstChild);
 
+            if (empty($struct['faultString']) && is_string($struct['faultCode'])) {
+                return new MethodFault(new Fault($struct['faultCode']));
+            }
+
             return new MethodFault(new Fault($struct['faultString'], $struct['faultCode']));
         }
 
@@ -191,7 +202,7 @@ class Implementation extends BaseImplementation
     }
 
     /**
-     * @param  MethodCall $call
+     * @param MethodCall $call
      * @return Request
      */
     public function createHttpRequest(MethodCall $call)
@@ -213,7 +224,7 @@ class Implementation extends BaseImplementation
     }
 
     /**
-     * @param  \DOMElement $element
+     * @param \DOMElement $element
      * @return string
      */
 
@@ -260,7 +271,7 @@ class Implementation extends BaseImplementation
     }
 
     /**
-     * @param  null                   $type
+     * @param null $type
      * @return ValueType\AbstractType
      */
 
@@ -281,15 +292,24 @@ class Implementation extends BaseImplementation
     protected function createType($type)
     {
         switch ($type) {
-            case ValueType::Null:     return new ValueType\NullType($this);
-            case ValueType::String:   return new ValueType\StringType($this);
-            case ValueType::Integer:  return new ValueType\IntegerType($this);
-            case ValueType::Boolean:  return new ValueType\BooleanType($this);
-            case ValueType::Double:   return new ValueType\DoubleType($this);
-            case ValueType::Date:     return new ValueType\DateType($this);
-            case ValueType::Blob:     return new ValueType\BlobType($this);
-            case ValueType::Set:      return new ValueType\ArrayType($this);
-            case ValueType::Object:   return new ValueType\ObjectType($this);
+            case ValueType::Null:
+                return new ValueType\NullType($this);
+            case ValueType::String:
+                return new ValueType\StringType($this);
+            case ValueType::Integer:
+                return new ValueType\IntegerType($this);
+            case ValueType::Boolean:
+                return new ValueType\BooleanType($this);
+            case ValueType::Double:
+                return new ValueType\DoubleType($this);
+            case ValueType::Date:
+                return new ValueType\DateType($this);
+            case ValueType::Blob:
+                return new ValueType\BlobType($this);
+            case ValueType::Set:
+                return new ValueType\ArrayType($this);
+            case ValueType::Object:
+                return new ValueType\ObjectType($this);
         }
 
         return null;
@@ -328,7 +348,7 @@ class Implementation extends BaseImplementation
 
     protected function isAssociative($value)
     {
-        foreach ((array) $value as $key => $value) {
+        foreach ((array)$value as $key => $value) {
             if (!is_numeric($key)) {
                 return true;
             }
